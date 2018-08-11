@@ -1,0 +1,689 @@
+﻿Imports System.Data
+Imports System.Data.OleDb
+Imports StokBengkel.Clsmy
+
+Public Class fopname
+
+    Private bs1 As BindingSource
+    Private ds As DataSet
+    Private dvmanager As Data.DataViewManager
+    Private dv1 As Data.DataView
+
+    Private dvmanager2 As Data.DataViewManager
+    Private dv2 As Data.DataView
+
+    Private isload_detail As Boolean = False
+
+    Private Sub opendata()
+
+        Dim tglsebelum As String = DateAdd(DateInterval.Month, -3, Date.Now)
+
+        Dim sql As String = String.Format("select * from tr_opname where tanggal>='{0}'  order by tanggal,nobukti ", convert_date_to_eng(tglsebelum))
+
+        Dim cn As OleDbConnection = Nothing
+
+        grid1.DataSource = Nothing
+
+        Try
+
+            open_wait()
+
+            dv1 = Nothing
+
+            cn = New OleDbConnection
+            cn = Clsmy.open_conn
+
+            ds = New DataSet()
+            ds = Clsmy.GetDataSet(sql, cn)
+
+            dvmanager = New DataViewManager(ds)
+            dv1 = dvmanager.CreateDataView(ds.Tables(0))
+
+            bs1 = New BindingSource
+            bs1.DataSource = dv1
+            bn1.BindingSource = bs1
+
+            grid1.DataSource = bs1
+
+            close_wait()
+
+
+        Catch ex As OleDb.OleDbException
+            close_wait()
+            MsgBox(ex.ToString, MsgBoxStyle.Information, "Informasi")
+        Finally
+
+
+            If Not cn Is Nothing Then
+                If cn.State = ConnectionState.Open Then
+                    cn.Close()
+                End If
+            End If
+
+        End Try
+
+    End Sub
+
+    Private Sub opendata2()
+
+        grid2.DataSource = Nothing
+        dv2 = Nothing
+
+        If isload_detail = True Then
+            Return
+        End If
+
+        If IsNothing(dv1) Then
+            Return
+        End If
+
+        If dv1.Count <= 0 Then
+            Return
+        End If
+
+        Dim sql As String = String.Format("SELECT ms_barang.kd_barang, ms_barang.nama_barang, tr_opname2.qty_k1, tr_opname2.qty_k2, tr_opname2.qty_r1, tr_opname2.qty_r2, tr_opname2.qty_sel1,tr_opname2.qty_sel2 " & _
+        "FROM tr_opname2 INNER JOIN ms_barang ON tr_opname2.kd_barang = ms_barang.kd_barang " & _
+        "WHERE tr_opname2.nobukti='{0}' ", dv1(bs1.Position)("nobukti").ToString)
+
+        Dim cn As OleDbConnection = Nothing
+
+        Try
+
+            open_wait()
+
+            cn = New OleDbConnection
+            cn = Clsmy.open_conn
+
+
+            Dim ds2 As DataSet
+            ds2 = New DataSet()
+            ds2 = Clsmy.GetDataSet(sql, cn)
+
+            dvmanager2 = New DataViewManager(ds2)
+            dv2 = dvmanager2.CreateDataView(ds2.Tables(0))
+
+            grid2.DataSource = dv2
+
+            close_wait()
+
+
+        Catch ex As OleDb.OleDbException
+            close_wait()
+            MsgBox(ex.ToString, MsgBoxStyle.Information, "Informasi")
+        Finally
+
+
+            If Not cn Is Nothing Then
+                If cn.State = ConnectionState.Open Then
+                    cn.Close()
+                End If
+            End If
+
+        End Try
+
+    End Sub
+
+    Private Sub cari()
+
+        'bs1.DataSource = Nothing
+        grid1.DataSource = Nothing
+        Dim cn As OleDbConnection = Nothing
+
+        Dim sql As String = ""
+        Dim scbo As Integer = tcbofind.SelectedIndex
+
+        sql = "select * from tr_opname"
+
+        Select Case tcbofind.SelectedIndex
+            Case 0 ' kode
+                sql = String.Format("{0} where nobukti='{1}'", sql, tfind.Text.Trim)
+            Case 1
+                If Not IsDate(tfind.Text.Trim) Then
+                    MsgBox("Koreksi Tanggal....", vbOKOnly + vbExclamation, "Informasi")
+                    Return
+                Else
+
+                    If tfind.Text.Trim.Length < 10 Or tfind.Text.Trim.Length > 10 Then
+                        MsgBox("Koreksi Tanggal....", vbOKOnly + vbExclamation, "Informasi")
+                        Return
+                    End If
+
+                End If
+
+                sql = String.Format("{0} where tanggal='{1}'", sql, convert_date_to_eng(tfind.Text.Trim))
+            Case 2
+                sql = String.Format("{0} where note like '%{1}%'", sql, tfind.Text.Trim)
+        End Select
+
+        If Not IsDate(tfind.Text.Trim) Then
+
+            Dim tglsebelum As String = DateAdd(DateInterval.Month, -3, Date.Now)
+
+            sql = String.Format("{0} and tanggal>='{1}'", sql, convert_date_to_eng(tglsebelum))
+
+        End If
+
+        sql = String.Format(" {0} order by tanggal,nobukti", sql)
+
+        Try
+
+            open_wait()
+
+            cn = New OleDbConnection
+            cn = Clsmy.open_conn
+
+            ds = New DataSet()
+            ds = Clsmy.GetDataSet(sql, cn)
+
+            dvmanager = New DataViewManager(ds)
+            dv1 = dvmanager.CreateDataView(ds.Tables(0))
+
+            bs1 = New BindingSource
+
+            bs1.DataSource = dv1
+            bn1.BindingSource = bs1
+
+            grid1.DataSource = bs1
+
+            close_wait()
+
+        Catch ex As Exception
+            close_wait()
+            MsgBox(ex.ToString, MsgBoxStyle.Information, "Informasi")
+        Finally
+            If Not cn Is Nothing Then
+                If cn.State = ConnectionState.Open Then
+                    cn.Close()
+                End If
+            End If
+        End Try
+
+    End Sub
+
+    Private Sub hapus()
+
+        Dim sqlcekuser As String = String.Format("select namauser from ms_usersys where namauser='{0}' and jenisuser='Admin'", userprog)
+
+        Dim cn As OleDbConnection = Nothing
+        Dim comd As OleDbCommand = Nothing
+
+        Try
+
+            open_wait()
+
+            cn = New OleDbConnection
+            cn = Clsmy.open_conn
+
+            Dim cmdcekuser As OleDbCommand = New OleDbCommand(sqlcekuser, cn)
+            Dim drdcekuser As OleDbDataReader = cmdcekuser.ExecuteReader
+            Dim adauser As Boolean = False
+
+            If drdcekuser.Read Then
+                If Not drdcekuser(0).ToString.Equals("") Then
+                    adauser = True
+                End If
+            End If
+            drdcekuser.Close()
+
+            If adauser = False Then
+                close_wait()
+                MsgBox("Hanya admin yang berhak membatalkan proses ini...", vbOKOnly + vbInformation, "Informasi")
+                Return
+            End If
+
+            close_wait()
+            If DateValue(Date.Now) <> DateValue(dv1(bs1.Position)("tanggal").ToString) Then
+                MsgBox("Tanggal sudah tidak sesuai dengan tanggal opname...", vbOKOnly + vbInformation, "Informasi")
+                Return
+            End If
+
+            Dim alasan_batal As String = InputBox("Alasan Batal : ", "Konfirmasi")
+            If alasan_batal.Trim.Equals("") Then
+                ' close_wait()
+                MsgBox("Alasan Batal harus diisi...", vbOKOnly + vbInformation, "Informasi")
+                Return
+            End If
+            
+            open_wait()
+
+            Dim sqltrans As OleDbTransaction = cn.BeginTransaction()
+
+            Dim sql As String = String.Format("update tr_opname set sbatal=1,alasan_batal='{0}' where nobukti='{1}'", alasan_batal.ToUpper, dv1(Me.BindingContext(bs1).Position)("nobukti").ToString)
+
+            comd = New OleDbCommand(sql, cn, sqltrans)
+            comd.ExecuteNonQuery()
+
+            Clsmy.InsertToLog(cn, "btopname", 0, 0, 1, 0, dv1(Me.BindingContext(bs1).Position)("nobukti").ToString, dv1(Me.BindingContext(bs1).Position)("tanggal").ToString, sqltrans)
+
+            If hapus2(cn, sqltrans) = True Then
+                sqltrans.Commit()
+
+                close_wait()
+
+                dv1(bs1.Position)("sbatal") = 1
+
+                MsgBox("Data telah dibatalkan...", vbOKOnly + vbInformation, "Informasi")
+            End If
+
+
+
+        Catch ex As Exception
+            close_wait()
+            MsgBox(ex.ToString, MsgBoxStyle.Information, "Informasi")
+        Finally
+
+            If Not cn Is Nothing Then
+                If cn.State = ConnectionState.Open Then
+                    cn.Close()
+                End If
+            End If
+
+        End Try
+
+
+    End Sub
+
+    Private Function hapus2(ByVal cn As OleDbConnection, ByVal sqltrans As OleDbTransaction) As Boolean
+
+        Dim hasil As Boolean = True
+
+        Dim nobukti As String = dv1(bs1.Position)("nobukti").ToString
+        Dim tanggal As String = dv1(bs1.Position)("tanggal").ToString
+
+        Dim sqlcek As String = ""
+        Dim cmdcek As OleDbCommand = Nothing
+        Dim drdcek As OleDbDataReader = Nothing
+
+        Dim sql As String = String.Format("select * from tr_opname2 where nobukti='{0}'", dv1(bs1.Position)("nobukti").ToString)
+        Dim dsk As DataSet = New DataSet
+        dsk = Clsmy.GetDataSet(sql, cn, sqltrans)
+        Dim dtk As DataTable = dsk.Tables(0)
+
+        For Each row As DataRow In dtk.Rows
+
+            Dim qtykecil As Integer = Integer.Parse(row.Item("qty_sel").ToString)
+            Dim qtykecil_akh As Integer = Integer.Parse(row.Item("qty_r").ToString)
+            Dim kdbar As String = row.Item("kd_barang").ToString
+            Dim idno As String = row.Item("noid").ToString
+
+            If IsNumeric(idno) Then
+
+                sqlcek = String.Format("select jmlstok from ms_barang where kd_barang='{0}'", kdbar)
+                cmdcek = New OleDbCommand(sqlcek, cn, sqltrans)
+                drdcek = cmdcek.ExecuteReader
+                If drdcek.Read Then
+                    If IsNumeric(drdcek(0).ToString) Then
+
+                        Dim jmla As Integer = Integer.Parse(drdcek(0).ToString)
+
+                        If jmla <> qtykecil_akh Then
+                            close_wait()
+                            MsgBox("Stok sudah tidak sesuai dengan stok akhir opname", vbOKOnly + vbInformation, "Informasi")
+                            hasil = False
+                            Exit For
+                        End If
+                    End If
+                End If
+                drdcek.Close()
+
+                Dim cmdcek_brang As OleDbCommand
+                Dim drd_barang As OleDbDataReader
+
+                Dim sqlcekbarang As String = String.Format("select b.kd_barang,b.jmlstok,b.qty1,b.qty2,1 as qty3 from ms_barang b where b.kd_barang='{0}'", kdbar)
+                cmdcek_brang = New OleDbCommand(sqlcekbarang, cn, sqltrans)
+
+                drd_barang = cmdcek_brang.ExecuteReader
+
+
+                If drd_barang.HasRows Then
+                    If drd_barang.Read Then
+                        If Not drd_barang("kd_barang").ToString.Equals("") Then
+
+
+                            Dim jmlstok As Integer = Integer.Parse(drd_barang("jmlstok").ToString)
+                            Dim jmlstok1 As Integer = 0
+
+                            Dim qty1 As Integer = Integer.Parse(drd_barang("qty1").ToString)
+                            Dim qty2 As Integer = Integer.Parse(drd_barang("qty2").ToString)
+                            Dim qty3 As Integer = Integer.Parse(drd_barang("qty3").ToString)
+
+                            Dim jml1, jml2, jml3 As Integer
+
+                            Dim totqty As Integer = qty1 * qty2 * qty3
+
+                            jmlstok = jmlstok - qtykecil
+
+                            If jmlstok >= totqty Then
+
+                                Dim sisa As Integer = jmlstok Mod totqty
+
+                                jml1 = (jmlstok - sisa) / totqty
+
+                                If sisa > qty2 Then
+                                    jml2 = sisa
+                                    sisa = sisa Mod qty2
+
+                                    jml2 = (jml2 - sisa) / qty2
+                                    jml3 = sisa
+
+                                Else
+                                    jml2 = sisa
+                                    jml3 = 0
+                                End If
+
+                            Else
+
+                                jml1 = 0
+                                jml2 = jmlstok
+                                jml3 = 0
+
+                            End If
+
+
+
+
+                            Dim sqlup As String = String.Format("update ms_barang set jmlstok1={0},jmlstok2={1},jmlstok={2} where kd_barang='{3}'", jml1, jml2, jmlstok, kdbar)
+
+                            Using cmd2 As OleDbCommand = New OleDbCommand(sqlup, cn, sqltrans)
+                                cmd2.ExecuteNonQuery()
+                            End Using
+
+
+
+
+                        Else
+
+                            close_wait()
+                            MsgBox(kdbar & " tidak ditemukan...", vbOKOnly + vbExclamation, "Informasi")
+                            hasil = False
+                            Exit For
+
+                        End If
+                    Else
+
+                        close_wait()
+                        MsgBox(kdbar & " tidak ditemukan...", vbOKOnly + vbExclamation, "Informasi")
+                        hasil = False
+                        Exit For
+
+                    End If
+                Else
+                    close_wait()
+                    MsgBox(kdbar & " tidak ditemukan...", vbOKOnly + vbExclamation, "Informasi")
+                    hasil = False
+                    Exit For
+                End If
+
+                drd_barang.Close()
+
+                '3. insert to hist stok
+                Clsmy.Insert_HistBarang(cn, sqltrans, nobukti, tanggal, kdbar, qtykecil, 0, "Opname (Batal)")
+
+            End If
+
+        Next
+
+        Return hasil
+
+    End Function
+
+    Private Sub Get_Aksesform()
+
+        Dim rows() As DataRow = dtmenu.Select(String.Format("NAMAFORM='{0}'", Me.Name.ToUpper.ToString))
+
+        If Convert.ToInt16(rows(0)("t_add")) = 1 Then
+            tsadd.Enabled = True
+        Else
+            tsadd.Enabled = False
+        End If
+
+        If Convert.ToInt16(rows(0)("t_edit")) = 1 Then
+            tsedit.Enabled = True
+        Else
+            tsedit.Enabled = False
+        End If
+
+        If Convert.ToInt16(rows(0)("t_del")) = 1 Then
+            tsdel.Enabled = True
+        Else
+            tsdel.Enabled = False
+        End If
+
+        If Convert.ToInt16(rows(0)("t_active")) = 1 Then
+            tsview.Enabled = True
+        Else
+            tsview.Enabled = False
+        End If
+
+        Dim rows2() As DataRow = dtmenu2.Select(String.Format("NAMAFORM='{0}'", Me.Name.ToUpper.ToString))
+
+        If rows2.Length > 0 Then
+            tsopname.Enabled = True
+            tsselisih_opn.Enabled = True
+        Else
+            tsopname.Enabled = False
+            tsselisih_opn.Enabled = False
+        End If
+
+    End Sub
+
+    Private Sub cek_batal(ByVal nobukti As String)
+
+        Dim cn As OleDbConnection = Nothing
+
+        Try
+
+            cn = New OleDbConnection
+            cn = Clsmy.open_conn
+
+            Dim sql As String = String.Format("select sbatal from tr_opname where nobukti='{0}'", nobukti)
+            Dim cmd As OleDbCommand = New OleDbCommand(sql, cn)
+            Dim drd As OleDbDataReader = cmd.ExecuteReader
+
+            If drd.Read Then
+                If Not drd(0).ToString.Equals("") Then
+                    dv1(bs1.Position)("sbatal") = drd("sbatal").ToString
+                End If
+            End If
+
+            drd.Close()
+
+        Catch ex As Exception
+            MsgBox(ex.ToString, MsgBoxStyle.Information, "Informasi")
+        Finally
+
+            If Not cn Is Nothing Then
+                If cn.State = ConnectionState.Open Then
+                    cn.Close()
+                End If
+            End If
+
+        End Try
+
+    End Sub
+
+    Private Sub fuser_Load(sender As Object, e As System.EventArgs) Handles Me.Load
+
+        tcbofind.SelectedIndex = 0
+
+        Get_Aksesform()
+
+        opendata()
+
+    End Sub
+
+    Private Sub tsfind_Click(sender As System.Object, e As System.EventArgs) Handles tsfind.Click
+        cari()
+    End Sub
+
+    Private Sub tfind_KeyDown(sender As System.Object, e As System.Windows.Forms.KeyEventArgs) Handles tfind.KeyDown
+        If e.KeyCode = 13 Then
+            cari()
+        End If
+    End Sub
+
+    Private Sub tsref_Click(sender As System.Object, e As System.EventArgs) Handles tsref.Click
+        tfind.Text = ""
+        opendata()
+    End Sub
+
+    Private Sub tsdel_Click(sender As System.Object, e As System.EventArgs) Handles tsdel.Click
+
+        If IsNothing(dv1) Then
+            Return
+        End If
+
+        If dv1.Count < 1 Then
+            Exit Sub
+        End If
+
+        cek_batal(dv1(bs1.Position)("nobukti").ToString)
+
+        If Integer.Parse(dv1(bs1.Position)("sbatal").ToString) = 1 Then
+            MsgBox("Data telah dibatalkan..", vbOKOnly + vbExclamation, "Informasi")
+            Return
+        End If
+
+        If MsgBox("Yakin akan dibatalkan ?", vbYesNo + vbQuestion, "Konfirmasi") = vbNo Then
+            Exit Sub
+        End If
+
+        hapus()
+
+    End Sub
+
+    Private Sub tsadd_Click(sender As Object, e As System.EventArgs) Handles tsadd.Click
+        isload_detail = True
+        Using fkar2 As New fopname2 With {.StartPosition = FormStartPosition.CenterParent, .dv = dv1, .addstat = True, .position = 0}
+            fkar2.ShowDialog()
+        End Using
+        isload_detail = False
+    End Sub
+
+    Private Sub tsedit_Click(sender As System.Object, e As System.EventArgs) Handles tsedit.Click
+
+        If IsNothing(dv1) Then
+            Exit Sub
+        End If
+
+        If dv1.Count < 1 Then
+            Exit Sub
+        End If
+
+        cek_batal(dv1(bs1.Position)("nobukti").ToString)
+
+        If Integer.Parse(dv1(bs1.Position)("sbatal").ToString) = 1 Then
+            MsgBox("Data telah dibatalkan..", vbOKOnly + vbExclamation, "Informasi")
+            Return
+        End If
+
+        If DateValue(Date.Now) <> DateValue(dv1(bs1.Position)("tanggal").ToString) Then
+            MsgBox("Tanggal sudah tidak sesuai dengan tanggal opname...", vbOKOnly + vbInformation, "Informasi")
+            Return
+        End If
+
+        isload_detail = True
+        Using fkar2 As New fopname2 With {.StartPosition = FormStartPosition.CenterParent, .dv = dv1, .addstat = False, .position = bs1.Position}
+            fkar2.ShowDialog()
+        End Using
+        isload_detail = False
+
+    End Sub
+
+    Private Sub tsview_Click(sender As System.Object, e As System.EventArgs) Handles tsview.Click
+
+        If IsNothing(dv1) Then
+            Exit Sub
+        End If
+
+        If dv1.Count < 1 Then
+            Exit Sub
+        End If
+
+        isload_detail = True
+
+        Using fkar2 As New fopname2 With {.StartPosition = FormStartPosition.CenterParent, .dv = dv1, .addstat = False, .position = bs1.Position}
+            fkar2.btadd.Enabled = False
+            fkar2.btdel.Enabled = False
+            fkar2.btsimpan.Enabled = False
+            fkar2.ShowDialog()
+        End Using
+
+        isload_detail = False
+
+    End Sub
+
+    Private Sub GridView1_Click(sender As Object, e As System.EventArgs) Handles GridView1.Click
+        opendata2()
+    End Sub
+
+    Private Sub GridView1_FocusedRowChanged(sender As Object, e As DevExpress.XtraGrid.Views.Base.FocusedRowChangedEventArgs) Handles GridView1.FocusedRowChanged
+        opendata2()
+    End Sub
+
+    Private Sub GridView1_SelectionChanged(sender As Object, e As DevExpress.Data.SelectionChangedEventArgs) Handles GridView1.SelectionChanged
+        opendata2()
+    End Sub
+
+    Private Sub tsopname_Click(sender As Object, e As EventArgs) Handles tsopname.Click
+
+        If IsNothing(dv1) Then
+            Exit Sub
+        End If
+
+        If dv1.Count < 1 Then
+            Exit Sub
+        End If
+
+        If dv1(bs1.Position)("sbatal").ToString.Equals("1") Then
+            MsgBox("Faktur telah dibatalkan...", vbOKOnly + vbExclamation, "Informasi")
+            Return
+        End If
+
+        cek_batal(dv1(bs1.Position)("nobukti").ToString)
+
+        Dim nobukti As String = dv1(bs1.Position)("nobukti").ToString
+
+        Dim sql1 As String = String.Format("SELECT tr_opname.nobukti, tr_opname.tanggal, tr_opname.note, ms_barang.kd_barang, ms_barang.nama_barang, tr_opname2.qty_k1, tr_opname2.qty_k2, " & _
+        "tr_opname2.qty_r1, tr_opname2.qty_r2, tr_opname2.qty_sel1, tr_opname2.qty_sel2, ms_barang.satuan1, ms_barang.satuan2 " & _
+        "FROM tr_opname INNER JOIN tr_opname2 ON tr_opname.nobukti = tr_opname2.nobukti INNER JOIN " & _
+        "ms_barang ON tr_opname2.kd_barang = ms_barang.kd_barang " & _
+        "WHERE tr_opname.sbatal=0 and tr_opname.nobukti='{0}'", nobukti)
+
+        Using fkar2 As New fpr_buktiopname With {.WindowState = FormWindowState.Maximized, .sql1 = sql1, .jenis = 1}
+            fkar2.ShowDialog(Me)
+        End Using
+
+    End Sub
+
+    Private Sub tsselisih_opn_Click(sender As Object, e As EventArgs) Handles tsselisih_opn.Click
+
+        If IsNothing(dv1) Then
+            Exit Sub
+        End If
+
+        If dv1.Count < 1 Then
+            Exit Sub
+        End If
+
+        If dv1(bs1.Position)("sbatal").ToString.Equals("1") Then
+            MsgBox("Faktur telah dibatalkan...", vbOKOnly + vbExclamation, "Informasi")
+            Return
+        End If
+
+        cek_batal(dv1(bs1.Position)("nobukti").ToString)
+
+        Dim nobukti As String = dv1(bs1.Position)("nobukti").ToString
+
+        Dim sql1 As String = String.Format("select a.nobukti,convert(date,a.tanggal) as tanggal,b.kd_barang,c.nama_barang,c.satuan1,c.satuan2,b.qty_sel1,b.qty_sel2,b.qty_sel,c.qty1,c.qty2,d.harga " & _
+        "from tr_opname a inner join tr_opname2 b on a.nobukti=b.nobukti " & _
+        "inner join ms_barang c on b.kd_barang=c.kd_barang left join v_hargaterakhir2 d on b.kd_barang=d.kd_barang " & _
+        "where a.sbatal=0 and b.qty_sel<>0 and a.nobukti='{0}'", nobukti)
+
+        Using fkar2 As New fpr_buktiopname With {.WindowState = FormWindowState.Maximized, .sql1 = sql1, .jenis = 2}
+            fkar2.ShowDialog(Me)
+        End Using
+
+    End Sub
+
+End Class
